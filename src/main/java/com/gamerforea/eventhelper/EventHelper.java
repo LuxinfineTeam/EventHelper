@@ -9,8 +9,7 @@ import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.Mod.EventHandler;
 import cpw.mods.fml.common.event.FMLServerStartedEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
-import cpw.mods.fml.relauncher.Side;
-import cpw.mods.fml.relauncher.SideOnly;
+import net.minecraft.launchwrapper.Launch;
 import net.minecraftforge.common.config.Configuration;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -27,13 +26,13 @@ import java.util.List;
 
 import static net.minecraftforge.common.config.Configuration.CATEGORY_GENERAL;
 
-@SideOnly(Side.SERVER)
 @Mod(modid = "EventHelper", name = "EventHelper", version = "@VERSION@", acceptableRemoteVersions = "*")
 public final class EventHelper
 {
 	public static final Logger LOGGER = LogManager.getLogger("EventHelper");
 	public static final File cfgDir = new File(Loader.instance().getConfigDir(), "Events");
-	public static final List<RegisteredListener> listeners = Lists.newArrayList();
+	//Специально без дженерика, чтобы можно было запустить в dev без бакита
+	public static final List listeners = Lists.newArrayList();
 	public static String craftPackage = "org.bukkit.craftbukkit.v1_7_R4";
 	public static boolean explosions = true;
 	public static boolean debug = true;
@@ -45,16 +44,23 @@ public final class EventHelper
 	}
 
 	@EventHandler
-	public final void serverStarted(FMLServerStartedEvent event)
+	public void serverStarted(FMLServerStartedEvent event)
 	{
 		Configuration cfg = ConfigUtils.getConfig("EventHelper");
 		String c = CATEGORY_GENERAL;
 		String[] plugins = cfg.getStringList("plugins", c, new String[] { "WorldGuard", "GriefPreventionPlus" }, "Plugins for sending events");
 		boolean pluginHooking = cfg.getBoolean("pluginHooking", c, true, "Hooking plugins (allow checking regions)");
-		craftPackage = cfg.getString("craftPackage", c, craftPackage, "CraftBukkit package (for reflection)");
 		explosions = cfg.getBoolean("explosions", c, explosions, "Explosions enabled");
 		debug = cfg.getBoolean("debug", c, debug, "Debugging enabled");
 		cfg.save();
+
+		if ((boolean) Launch.blackboard.get("fml.deobfuscatedEnvironment")) {
+			if (debug)
+				LOGGER.info("Skip injectors initialization because running in dev mode");
+			return;
+		}
+
+		craftPackage = "org.bukkit.craftbukkit." + detectCraftVersion();
 
 		PluginManager plManager = Bukkit.getPluginManager();
 		for (String plName : plugins)
@@ -71,11 +77,11 @@ public final class EventHelper
 
 	public static void callEvent(Event event)
 	{
-		for (RegisteredListener listener : listeners)
+		for (Object listener : listeners)
 		{
 			try
 			{
-				listener.callEvent(event);
+				((RegisteredListener)listener).callEvent(event);
 			}
 			catch (Throwable throwable)
 			{
@@ -91,5 +97,16 @@ public final class EventHelper
 			LOGGER.error(new FormattedMessage(message, args), throwable);
 		else
 			LOGGER.error(message, args);
+	}
+
+	private static String detectCraftVersion() {
+		String clazz = Bukkit.getServer().getClass().getName();
+		if (!clazz.startsWith("org.bukkit.craftbukkit.") || !clazz.endsWith(".CraftServer"))
+			throw new IllegalStateException("Cant detect craftbukkit version, bad server class name: " + clazz);
+		String craftBukkitPackage = clazz.substring("org.bukkit.craftbukkit.".length());
+		craftBukkitPackage = craftBukkitPackage.substring(0, craftBukkitPackage.length() - ".CraftServer".length());
+		if (debug)
+        	LOGGER.info("Runtime craft bukkit version: {}", craftBukkitPackage);
+		return craftBukkitPackage;
 	}
 }

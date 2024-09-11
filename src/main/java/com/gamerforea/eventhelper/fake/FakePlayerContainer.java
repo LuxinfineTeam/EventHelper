@@ -125,6 +125,16 @@ public abstract class FakePlayerContainer
 		this.profile = profile == null || !profile.isComplete() ? null : profile;
 	}
 
+	public final boolean cantPlace(int x, int y, int z)
+	{
+		return EventUtils.cantPlace(this.get(), x, y, z);
+	}
+
+	public final boolean cantPlace(double x, double y, double z)
+	{
+		return EventUtils.cantPlace(this.get(), x, y, z);
+	}
+
 	public final boolean cantBreak(int x, int y, int z)
 	{
 		return EventUtils.cantBreak(this.get(), x, y, z);

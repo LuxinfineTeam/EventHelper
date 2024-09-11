@@ -12,12 +12,14 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockFromToEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.event.entity.EntityTeleportEvent;
@@ -33,6 +35,31 @@ import static net.minecraft.util.MathHelper.floor_double;
 
 public final class EventUtils
 {
+	public static boolean cantPlace(@Nonnull EntityPlayer player, int x, int y, int z)
+	{
+		try
+		{
+			Player bPlayer = toBukkitEntity(player);
+			Block bTarget = bPlayer.getWorld().getBlockAt(x, y, z);
+			BlockPlaceEvent event = new BlockPlaceEvent(bTarget, bTarget.getState(), bTarget, null, bPlayer, true);
+			EventHelper.callEvent(event);
+			return event.isCancelled() || !event.canBuild();
+		}
+		catch (Throwable throwable)
+		{
+			EventHelper.error(throwable, "Failed call BlockPlaceEvent: [Player: {}, X:{}, Y:{}, Z:{}]", String.valueOf(player), x, y, z);
+			return true;
+		}
+	}
+
+	public static boolean cantPlace(@Nonnull EntityPlayer player, double x, double y, double z)
+	{
+		int xx = floor_double(x);
+		int yy = floor_double(y);
+		int zz = floor_double(z);
+		return cantPlace(player, xx, yy, zz);
+	}
+
 	public static boolean cantBreak(@Nonnull EntityPlayer player, int x, int y, int z)
 	{
 		try
